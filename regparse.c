@@ -4836,27 +4836,28 @@ parse_char_class(Node** np, Node** asc_np, OnigToken* tok, UChar** src, UChar* e
 	and_start = 1;
 	state = CCS_START;
 
-	if (IS_NOT_NULL(prev_cc)) {
-	  r = and_cclass(prev_cc, cc, env);
-	  if (r != 0) goto err;
-	  bbuf_free(cc->mbuf);
-	  if (IS_NOT_NULL(asc_cc)) {
-	    r = and_cclass(asc_prev_cc, asc_cc, env);
-	    if (r != 0) goto err;
-	    bbuf_free(asc_cc->mbuf);
-	  }
-	}
-	else {
-	  prev_cc = cc;
-	  cc = &work_cc;
-	  if (IS_NOT_NULL(asc_cc)) {
-	    asc_prev_cc = asc_cc;
-	    asc_cc = &asc_work_cc;
-	  }
-	}
-	initialize_cclass(cc);
-	if (IS_NOT_NULL(asc_cc))
-	  initialize_cclass(asc_cc);
+        if (IS_NOT_NULL(prev_cc)) {
+          r = and_cclass(prev_cc, cc, env);
+          if (r != 0) goto err;
+          bbuf_free(cc->mbuf);
+          cc->mbuf = NULL;
+          if (IS_NOT_NULL(asc_cc)) {
+            r = and_cclass(asc_prev_cc, asc_cc, env);
+            if (r != 0) goto err;
+            bbuf_free(asc_cc->mbuf);
+          }
+        }
+        else {
+          prev_cc = cc;
+          cc = &work_cc;
+          if (IS_NOT_NULL(asc_cc)) {
+            asc_prev_cc = asc_cc;
+            asc_cc = &asc_work_cc;
+          }
+        }
+        initialize_cclass(cc);
+        if (IS_NOT_NULL(asc_cc))
+          initialize_cclass(asc_cc);
       }
       break;
 
