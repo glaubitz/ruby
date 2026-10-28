@@ -1823,19 +1823,20 @@ match_at(regex_t* reg, const UChar* str, const UChar* end,
 	int len;
 	UChar *q, lowbuf[ONIGENC_MBC_CASE_FOLD_MAXLEN];
 
-	DATA_ENSURE(1);
-	len = ONIGENC_MBC_CASE_FOLD(encode,
-		    /* DISABLE_CASE_FOLD_MULTI_CHAR(case_fold_flag), */
-		    case_fold_flag,
-		    &s, end, lowbuf);
-	DATA_ENSURE(0);
-	q = lowbuf;
-	while (len-- > 0) {
-	  if (*p != *q) {
-	    goto fail;
-	  }
-	  p++; q++;
-	}
+        DATA_ENSURE(1);
+        len = ONIGENC_MBC_CASE_FOLD(encode,
+                    /* DISABLE_CASE_FOLD_MULTI_CHAR(case_fold_flag), */
+                    case_fold_flag,
+                    &s, end, lowbuf);
+        DATA_ENSURE(0);
+        if (len != enclen(encode, p, reg->p + reg->used)) goto fail;
+        q = lowbuf;
+        while (len-- > 0) {
+          if (*p != *q) {
+            goto fail;
+          }
+          p++; q++;
+        }
       }
       MOP_OUT;
       NEXT;
@@ -1910,20 +1911,21 @@ match_at(regex_t* reg, const UChar* str, const UChar* end,
 	GET_LENGTH_INC(tlen, p);
 	endp = p + tlen;
 
-	while (p < endp) {
-	  sprev = s;
-	  DATA_ENSURE(1);
-	  len = ONIGENC_MBC_CASE_FOLD(encode,
-		      /* DISABLE_CASE_FOLD_MULTI_CHAR(case_fold_flag), */
-		      case_fold_flag,
-		      &s, end, lowbuf);
-	  DATA_ENSURE(0);
-	  q = lowbuf;
-	  while (len-- > 0) {
-	    if (*p != *q) goto fail;
-	    p++; q++;
-	  }
-	}
+        while (p < endp) {
+          sprev = s;
+          DATA_ENSURE(1);
+          len = ONIGENC_MBC_CASE_FOLD(encode,
+                      /* DISABLE_CASE_FOLD_MULTI_CHAR(case_fold_flag), */
+                      case_fold_flag,
+                      &s, end, lowbuf);
+          DATA_ENSURE(0);
+          if (len > endp - p) goto fail;
+          q = lowbuf;
+          while (len-- > 0) {
+            if (*p != *q) goto fail;
+            p++; q++;
+          }
+        }
       }
 
       MOP_OUT;
