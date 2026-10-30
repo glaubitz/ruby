@@ -1049,6 +1049,12 @@ class TestRegexp < Test::Unit::TestCase
     assert_match(/^\u03b9\u0308\u0301$/i, "\u0390")
   end
 
+  def test_backref_ignorecase_at_end_of_string
+    assert_no_match(/(k\0)\1/i, "k\0\u212a")
+    assert_match(/(k)\1/i, "k\u212a")
+    assert_match(/(k\0)\1/i, "k\0\u212a\0")
+  end
+
   def test_unicode_age
     assert_match(/^\p{Age=6.0}$/u, "\u261c")
     assert_match(/^\p{Age=1.1}$/u, "\u261c")
