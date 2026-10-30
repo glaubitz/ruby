@@ -4714,13 +4714,13 @@ parse_char_class(Node** np, Node** asc_np, OnigToken* tok, UChar** src, UChar* e
 
     case TK_CHAR_TYPE:
       r = add_ctype_to_cc(cc, tok->u.prop.ctype, tok->u.prop.not,
-			  IS_ASCII_RANGE(env->option), env);
-      if (r != 0) return r;
+                          IS_ASCII_RANGE(env->option), env);
+      if (r != 0) goto err;
       if (IS_NOT_NULL(asc_cc)) {
-	if (tok->u.prop.ctype != ONIGENC_CTYPE_WORD)
-	  r = add_ctype_to_cc(asc_cc, tok->u.prop.ctype, tok->u.prop.not,
-			      IS_ASCII_RANGE(env->option), env);
-	if (r != 0) return r;
+        if (tok->u.prop.ctype != ONIGENC_CTYPE_WORD)
+          r = add_ctype_to_cc(asc_cc, tok->u.prop.ctype, tok->u.prop.not,
+                              IS_ASCII_RANGE(env->option), env);
+        if (r != 0) goto err;
       }
 
     next_class:
@@ -4732,16 +4732,19 @@ parse_char_class(Node** np, Node** asc_np, OnigToken* tok, UChar** src, UChar* e
       {
 	int ctype;
 
-	ctype = fetch_char_property_to_ctype(&p, end, env);
-	if (ctype < 0) return ctype;
-	r = add_ctype_to_cc(cc, ctype, tok->u.prop.not, 0, env);
-	if (r != 0) return r;
-	if (IS_NOT_NULL(asc_cc)) {
-	  if (ctype != ONIGENC_CTYPE_ASCII)
-	    r = add_ctype_to_cc(asc_cc, ctype, tok->u.prop.not, 0, env);
-	  if (r != 0) return r;
-	}
-	goto next_class;
+        ctype = fetch_char_property_to_ctype(&p, end, env);
+        if (ctype < 0) {
+          r = ctype;
+          goto err;
+        }
+        r = add_ctype_to_cc(cc, ctype, tok->u.prop.not, 0, env);
+        if (r != 0) goto err;
+        if (IS_NOT_NULL(asc_cc)) {
+          if (ctype != ONIGENC_CTYPE_ASCII)
+            r = add_ctype_to_cc(asc_cc, ctype, tok->u.prop.not, 0, env);
+          if (r != 0) goto err;
+        }
+        goto next_class;
       }
       break;
 
