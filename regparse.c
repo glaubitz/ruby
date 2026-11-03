@@ -4630,10 +4630,9 @@ parse_char_class(Node** np, Node** asc_np, OnigToken* tok, UChar** src, UChar* e
     case TK_RAW_BYTE:
       /* tok->base != 0 : octal or hexadec. */
       if (! ONIGENC_IS_SINGLEBYTE(env->enc) && tok->base != 0) {
-	UChar buf[ONIGENC_CODE_TO_MBC_MAXLEN];
-	UChar* bufe = buf + ONIGENC_CODE_TO_MBC_MAXLEN;
-	UChar* psave = p;
-	int i, base = tok->base;
+        UChar buf[ONIGENC_CODE_TO_MBC_MAXLEN];
+        UChar* psave = p;
+        int i, base = tok->base;
 
 	buf[0] = (UChar )tok->u.c;
 	for (i = 1; i < ONIGENC_MBC_MAXLEN(env->enc); i++) {
@@ -4651,28 +4650,29 @@ parse_char_class(Node** np, Node** asc_np, OnigToken* tok, UChar** src, UChar* e
 	  goto err;
 	}
 
-	len = enclen(env->enc, buf, buf + i);
-	if (i < len) {
-	  r = ONIGERR_TOO_SHORT_MULTI_BYTE_STRING;
-	  goto err;
-	}
-	else if (i > len) { /* fetch back */
-	  p = psave;
-	  for (i = 1; i < len; i++) {
-	    (void)fetch_token_in_cc(tok, &p, end, env);
-	    /* no need to check the retun value (already checked above) */
-	  }
-	  fetched = 0;
-	}
+        len = ONIGENC_PRECISE_MBC_ENC_LEN(env->enc, buf, buf + i);
+        if (! ONIGENC_MBCLEN_CHARFOUND_P(len)) {
+          r = ONIGENC_MBCLEN_NEEDMORE_P(len) ?
+            ONIGERR_TOO_SHORT_MULTI_BYTE_STRING : ONIGERR_INVALID_CODE_POINT_VALUE;
+          goto err;
+        }
+        else if (i > len) { /* fetch back */
+          p = psave;
+          for (i = 1; i < len; i++) {
+            (void)fetch_token_in_cc(tok, &p, end, env);
+            /* no need to check the return value (already checked above) */
+          }
+          fetched = 0;
+        }
 
-	if (i == 1) {
-	  v = (OnigCodePoint )buf[0];
-	  goto raw_single;
-	}
-	else {
-	  v = ONIGENC_MBC_TO_CODE(env->enc, buf, bufe);
-	  in_type = CCV_CODE_POINT;
-	}
+        if (i == 1) {
+          v = (OnigCodePoint )buf[0];
+          goto raw_single;
+        }
+        else {
+          v = ONIGENC_MBC_TO_CODE(env->enc, buf, buf + len);
+          in_type = CCV_CODE_POINT;
+        }
       }
       else {
 	v = (OnigCodePoint )tok->u.c;
@@ -6628,13 +6628,17 @@ parse_exp(Node** np, OnigToken* tok, int term,
       CHECK_NULL_RETURN_MEMERR(*np);
       len = 1;
       while (1) {
-	if (len >= ONIGENC_MBC_MINLEN(env->enc)) {
-	  if (len == enclen(env->enc, NSTR(*np)->s, NSTR(*np)->end)) {
-	    r = fetch_token(tok, src, end, env);
-	    NSTRING_CLEAR_RAW(*np);
-	    goto string_end;
-	  }
-	}
+        if (len >= ONIGENC_MBC_MINLEN(env->enc)) {
+          int n = ONIGENC_IS_SINGLEBYTE(env->enc) ? 1 :
+            ONIGENC_PRECISE_MBC_ENC_LEN(env->enc, NSTR(*np)->s, NSTR(*np)->end);
+          if (n == len) {
+            r = fetch_token(tok, src, end, env);
+            NSTRING_CLEAR_RAW(*np);
+            goto string_end;
+          }
+          if (! ONIGENC_MBCLEN_NEEDMORE_P(n))
+            return ONIGERR_INVALID_CODE_POINT_VALUE;
+        }
 
 	r = fetch_token(tok, src, end, env);
 	if (r < 0) return r;
