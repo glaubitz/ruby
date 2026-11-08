@@ -518,6 +518,9 @@ rb_reg_inspect(VALUE re)
     return rb_reg_desc(RREGEXP_SRC_PTR(re), RREGEXP_SRC_LEN(re), re);
 }
 
+static VALUE
+rb_reg_preprocess(const char *p, const char *end, rb_encoding *enc,
+        rb_encoding **fixed_enc, onig_errmsg_buffer err);
 
 /*
  *  call-seq:
@@ -583,31 +586,40 @@ rb_reg_to_s(VALUE re)
                 else {
                     break;
                 }
-		++ptr;
-	    } while (--len > 0);
-	}
-	if (*ptr == ')') {
-	    --len;
-	    ++ptr;
-	    goto again;
-	}
-	if (*ptr == ':' && ptr[len-1] == ')') {
-	    Regexp *rp;
-	    VALUE verbose = ruby_verbose;
-	    ruby_verbose = Qfalse;
+                ++ptr;
+            } while (--len > 0);
+        }
+        if (*ptr == ')') {
+            --len;
+            ++ptr;
+            goto again;
+        }
+        if (*ptr == ':' && ptr[len-1] == ')') {
+            Regexp *rp;
+            VALUE verbose = ruby_verbose;
+            rb_encoding *fixed_enc = 0;
+            onig_errmsg_buffer errmsg = "";
+            VALUE unescaped;
 
-	    ++ptr;
-	    len -= 2;
-            err = onig_new(&rp, ptr, ptr + len, options,
-			   enc, OnigDefaultSyntax, NULL);
-	    onig_free(rp);
-	    ruby_verbose = verbose;
-	}
-	if (err) {
-	    options = RREGEXP_PTR(re)->options;
-	    ptr = (UChar*)RREGEXP_SRC_PTR(re);
-	    len = RREGEXP_SRC_LEN(re);
-	}
+            ++ptr;
+            len -= 2;
+            unescaped = rb_reg_preprocess((const char *)ptr, (const char *)ptr + len,
+                                          enc, &fixed_enc, errmsg);
+            if (!NIL_P(unescaped)) {
+                ruby_verbose = Qfalse;
+                err = onig_new(&rp, (UChar *)RSTRING_PTR(unescaped),
+                               (UChar *)RSTRING_END(unescaped), options,
+                               enc, OnigDefaultSyntax, NULL);
+                onig_free(rp);
+                ruby_verbose = verbose;
+                RB_GC_GUARD(unescaped);
+            }
+        }
+        if (err) {
+            options = RREGEXP_PTR(re)->options;
+            ptr = (UChar*)RREGEXP_SRC_PTR(re);
+            len = RREGEXP_SRC_LEN(re);
+        }
     }
 
     if (*option_to_str(optbuf, options)) rb_str_buf_cat2(str, optbuf);
@@ -1344,11 +1356,6 @@ rb_reg_fixed_encoding_p(VALUE re)
     else
         return Qfalse;
 }
-
-static VALUE
-rb_reg_preprocess(const char *p, const char *end, rb_encoding *enc,
-        rb_encoding **fixed_enc, onig_errmsg_buffer err);
-
 
 static void
 reg_enc_error(VALUE re, VALUE str)
